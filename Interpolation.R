@@ -44,6 +44,11 @@ write.csv(precip, paste(datum, ".csv", sep=""))
 preciPoints <- SpatialPoints(precip[,2:3], proj4string=CRS("+proj=utm +zone=32 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs")) #UTM 32N
 preciPoints <- SpatialPointsDataFrame(preciPoints, precip[,c(1,4)])
 
+# check if we have duplicate points
+zerodist(preciPoints)
+# two stations at the same location - that will cause trouble later, let#s remove them both:
+preciPoints <- preciPoints[-c(32,77),]
+
 # check the maximum value
 max(preciPoints$Tagessumme)
 
@@ -96,12 +101,45 @@ tps <- mask(tps, NRW)
 spplot(tps, main="Spline mit lambda=0.000001")
 
 
+# Semivariogram
 
+gs <- gstat(formula=Tagessumme~1, locations=preciPoints)
+v <- variogram(gs, width=10000, cutoff=200000)
+plot(v, main="Semivariogramm", pch=20, col='red')
+
+# fit exponential model
+fve <- fit.variogram(v, vgm("Exp"))
+fve
+plot(variogramLine(fve, 200000), type='l', ylim=c(0,22), main="Semivariogramm (exponential)")
+points(v[,2:3], pch=20, col='red')
+
+# fit spherical model
+fvsph <- fit.variogram(v, vgm("Sph"))
+fvsph
+plot(variogramLine(fvsph, 200000), type='l', ylim=c(0,22), main="Semivariogramm (spherical)")
+points(v[,2:3], pch=20, col='red')
+
+# using the exponential model for a kriging interpolation
+k <- gstat(formula=Tagessumme~1, locations=preciPoints, model=fve)
+# predicted values - first we need a grid:
+g <- as(r, 'SpatialGrid')
+kp <- predict(k, g)
+spplot(kp)
+
+# clip to NRW
+ok <- brick(kp)
+ok <- mask(ok, NRW)
+names(ok) <- c('prediction', 'variance')
+spplot(ok)
+
+# Cross-validation
 
 # define root mean square error
 RMSE <- function(observed, predicted) {
   sqrt(mean((predicted - observed)^2, na.rm=TRUE))
 }
+
+
 
 
 
