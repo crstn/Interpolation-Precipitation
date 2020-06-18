@@ -4,6 +4,7 @@ library(sf)
 library(dismo)
 library(deldir)
 library(gstat)
+library(fields)
 
 # set the working directory in R Studio:
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
@@ -71,16 +72,30 @@ plot(voro)
 voro.nrw <- intersect(voro, aggregate(NRW.sp))
 spplot(voro.nrw, 'Tagessumme', main="Nearest neighbor interpolation")
 
+# rasterize:
+
+# blank raster
+r <- raster(NRW, res=2500)
+
+vr <- rasterize(voro.nrw, r, 'Tagessumme')
+spplot(vr, main="Nearest Neighbor")
+
 
 # IDW
-# blank raster
-r <- raster(NRW, res=500)
 
 gs <- gstat(formula=Tagessumme~1, locations=preciPoints, nmax=7, set = list(idp = 1))
 idw <- interpolate(r, gs)
 ## [inverse distance weighted interpolation]
 idwr <- mask(idw, NRW)
 spplot(idwr)
+
+# Spline
+m <- Tps(coordinates(preciPoints), preciPoints$Tagessumme, lambda=0.000001)
+tps <- interpolate(r, m)
+tps <- mask(tps, NRW)
+spplot(tps, main="Spline mit lambda=0.000001")
+
+
 
 
 # define root mean square error
