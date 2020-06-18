@@ -139,9 +139,55 @@ RMSE <- function(observed, predicted) {
   sqrt(mean((predicted - observed)^2, na.rm=TRUE))
 }
 
+f1 <- function(x, test, train) {
+  nmx <- x[1]
+  idp <- x[2]
+  if (nmx < 1) return(Inf)
+  if (idp < .001) return(Inf)
+  m <- gstat(formula=Tagessumme~1, locations=train, nmax=nmx, set=list(idp=idp))
+  p <- predict(m, newdata=test, debug.level=0)$var1.pred
+  RMSE(test$Tagessumme, p)
+}
+
+# randomly split into test (20%) and training data (80%)
+set.seed(20200618)
+i <- sample(nrow(preciPoints), 0.2 * nrow(preciPoints))
+tst <- preciPoints[i,]
+trn <- preciPoints[-i,]
+opt <- optim(c(8, .5), f1, test=tst, train=trn)
+
+nfolds <- 20
+k <- kfold(preciPoints, nfolds)
+spline.rmse <- kriging.rmse <- idw.rmse <- rep(NA, nfolds)
+
+for (i in 1:nfolds) {
+  test <- preciPoints[k!=i,]
+  train <- preciPoints[k==i,]
+  m <- gstat(formula=Tagessumme~1, 
+             locations=train, 
+             nmax=opt$par[1], 
+             set=list(idp=opt$par[2]))
+  p1 <- predict(m, newdata=test, debug.level=0)$var1.pred
+  idw.rmse[i] <-  RMSE(test$Tagessumme, p1)
+  m <- gstat(formula=Tagessumme~1, locations=train, model=fve)
+  p2 <- predict(m, newdata=test, debug.level=0)$var1.pred
+  kriging.rmse[i] <-  RMSE(test$Tagessumme, p2)
+  m <- Tps(coordinates(train), train$Tagessumme)
+  p3 <- predict(m, coordinates(test))
+  spline.rmse[i] <-  RMSE(test$Tagessumme, p3)
+  w <- c(idw.rmse[i], kriging.rmse[i], spline.rmse[i])
+}
+
+rmi <- mean(idw.rmse)
+rmk <- mean(kriging.rmse)
+rmt <- mean(spline.rmse)
+rms <- c(rmi, rmt, rmk)
+rms
 
 
-
+boxplot(data.frame(idw.rmse, spline.rmse, kriging.rmse), 
+        ylab="RMSE",
+        labels=c("IDW", "Spline", "Kriging"))
 
 
 
