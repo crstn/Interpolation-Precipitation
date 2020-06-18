@@ -80,7 +80,7 @@ spplot(voro.nrw, 'Tagessumme', main="Nearest neighbor interpolation")
 # rasterize:
 
 # blank raster
-r <- raster(NRW, res=2500)
+r <- raster(NRW.sf, res=2500)
 
 vr <- rasterize(voro.nrw, r, 'Tagessumme')
 spplot(vr, main="Nearest Neighbor")
@@ -91,13 +91,13 @@ spplot(vr, main="Nearest Neighbor")
 gs <- gstat(formula=Tagessumme~1, locations=preciPoints, nmax=7, set = list(idp = 1))
 idw <- interpolate(r, gs)
 ## [inverse distance weighted interpolation]
-idwr <- mask(idw, NRW)
+idwr <- mask(idw, NRW.sf)
 spplot(idwr)
 
 # Spline
 m <- Tps(coordinates(preciPoints), preciPoints$Tagessumme, lambda=0.000001)
 tps <- interpolate(r, m)
-tps <- mask(tps, NRW)
+tps <- mask(tps, NRW.sf)
 spplot(tps, main="Spline mit lambda=0.000001")
 
 
@@ -128,7 +128,7 @@ spplot(kp)
 
 # clip to NRW
 ok <- brick(kp)
-ok <- mask(ok, NRW)
+ok <- mask(ok, NRW.sf)
 names(ok) <- c('prediction', 'variance')
 spplot(ok)
 
@@ -189,5 +189,10 @@ boxplot(data.frame(idw.rmse, spline.rmse, kriging.rmse),
         ylab="RMSE",
         labels=c("IDW", "Spline", "Kriging"))
 
+
+# plot them all together
+s <- stack(vr, idwr, tps, ok[[1]])
+names(s) <- c('Nearest Neighbor', 'IDW', 'Spline', 'Kriging')
+spplot(s)
 
 
